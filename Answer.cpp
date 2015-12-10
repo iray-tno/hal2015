@@ -21,6 +21,8 @@
 namespace {
     using namespace std;
     using namespace hpc;
+    constexpr int PINF = std::numeric_limits<int>::max();
+    constexpr int MINF = std::numeric_limits<int>::lowest();
     template<class T = int> inline bool within(T min_x, T x, T max_x){ return min_x<=x&&x<max_x; }
     class BFSQuery{ public: int x,y,d; };
     constexpr int dxy[] = {-1,0,1,0,0,-1,0,1};
@@ -40,8 +42,8 @@ namespace {
             width_ = field_.width();
             height_ = field_.height();
             home_ = field_.officePos();
-            build_d_fields();
-
+            build_dmap();
+            build_dtable();
         };
         inline void think(const Stage& aStage, vector<vector<int>>* items_p, vector<vector<int>>* actions_p){
             //vector<vector<int>>& items = *items_p;
@@ -54,41 +56,43 @@ namespace {
             build_actions(items,actions);
         }
     protected:
-        vector<vector<vector<int>>> dist_to_items_;
-        vector<vector<int>> dist_to_home_;
+        vector<vector<vector<int>>> dmap_to_items_;
+        vector<vector<int>> dmap_to_home_;
+        vector<vector<int>> dtable_;
+        vector<int> dtable_home_;
         int width_,height_;
         Pos home_;
         ItemCollection items_;
         int num_of_items_;
         Field field_;
-        inline void build_d_fields(){
-            init_d_fields();
-            calc_d_fields();
+        inline void build_dmap(){
+            init_dmap();
+            calc_dmap();
         };
-        inline void init_d_fields(){
-            dist_to_items_ = 
+        inline void init_dmap(){
+            dmap_to_items_ = 
                 vector<vector<vector<int>>>(num_of_items_,
                     vector<vector<int>>(width_,
                         vector<int>(height_,-1)));
-            dist_to_home_ = vector<vector<int>>(width_,
+            dmap_to_home_ = vector<vector<int>>(width_,
                         vector<int>(height_,-1));
         };
-        inline void calc_d_fields(){
+        inline void calc_dmap(){
             for(int i = 0; i < num_of_items_; ++i){
                 Pos dest = items_[i].destination();
                 //int x_zero = dest.x, y_zero = dest.y;
-                //bfs_d_field(&dist_to_items_[i],dest.x,dest.y);
-                bfs_d_field(dist_to_items_[i],dest.x,dest.y);
+                //bfs_dmap(&dmap_to_items_[i],dest.x,dest.y);
+                bfs_dmap(dmap_to_items_[i],dest.x,dest.y);
             }
-            //bfs_d_field(&dist_to_home_,home_.x,home_.y);
-            bfs_d_field(dist_to_home_,home_.x,home_.y);
+            //bfs_dmap(&dmap_to_home_,home_.x,home_.y);
+            bfs_dmap(dmap_to_home_,home_.x,home_.y);
         };
-        inline void bfs_d_field(vector<vector<int>>* field_p,int x_zero,int y_zero){
-            //vector<vector<int>& field = *field_p;
-            bfs_d_field(*field_p,x_zero,y_zero);
+        inline void bfs_dmap(vector<vector<int>>* dmap_p,int x_zero,int y_zero){
+            //vector<vector<int>& field = *dmap_p;
+            bfs_dmap(*dmap_p,x_zero,y_zero);
         }
-        inline void bfs_d_field(vector<vector<int>>& field,int x_zero,int y_zero){
-            field[x_zero][y_zero] = 0;
+        inline void bfs_dmap(vector<vector<int>>& dmap,int x_zero,int y_zero){
+            dmap[x_zero][y_zero] = 0;
             queue<BFSQuery> ques;
             ques.push({x_zero,y_zero,0});
             while(!ques.empty()){
@@ -97,8 +101,8 @@ namespace {
                 for(int i = 0; i < 4; ++i){
                     int nx = x+dxy[i*2], ny = y+dxy[i*2+1];
                     if(within(0,nx,width_)&&within(0,ny,height_)){
-                        if((!field_.isWall(nx,ny))&&field[nx][ny]==-1){
-                            field[nx][ny]=d+1;
+                        if((!field_.isWall(nx,ny))&&dmap[nx][ny]==-1){
+                            dmap[nx][ny]=d+1;
                             ques.push({nx,ny,d+1});
                         }
                     }
@@ -107,18 +111,36 @@ namespace {
             return ;
             for(int i = 0; i < width_; ++i){
                 for(int j = 0; j < height_; ++j){
-                    cout << " " << setfill(' ') << setw(3) << right << field[i][j];
-                    //cout << " " << field[i][j];
+                    cout << " " << setfill(' ') << setw(3) << right << dmap[i][j];
+                    //cout << " " << dmap[i][j];
                 }
                 cout << endl;
             }
         }
-        inline void calc_score(vector<int> seq){
-
+        inline void build_dtable(){
+            init_dtable();
+            calc_dtable();
         }
-
+        inline void init_dtable(){
+            dtable_ = vector<vector<int>>(num_of_items_,
+                vector<int>(num_of_items_,-1));
+            dtable_home_ = vector<int>(num_of_items_,-1);
+        };
+        inline void calc_dtable(){
+            int home_x = home_.x,home_y = home_.y;
+            for(int i = 0; i < num_of_items_; ++i){
+                const Pos& dest = items_[i].destination();
+                int dest_x = dest.x,dest_y = dest.y;
+                dtable_home_[i] = dmap_to_items_[i][home_x][home_y];
+                for(int j = 0; j < num_of_items_; ++j){
+                    int dist = dmap_to_items_[j][dest_x][dest_y];
+                    dtable_[i][j] = dist;
+                    //dtable_[j][i] = dist;
+                }
+            }
+        };
         inline void think_sequenses(vector<vector<int>>& items){
-            //cout << "!unko" << endl;
+            //cout << "!think_sequenses" << endl;
             items = vector<vector<int>>(4,vector<int>(0));
             vector<int> perm(num_of_items_,0);
             iota(perm.begin(), perm.end(), 0);
@@ -154,7 +176,57 @@ namespace {
                     }
                 }
             }
+            for(auto& seq : items){
+                int loop_max = calc_loop_max(seq.size());
+                int best_score = PINF;
+                vector<int> best_seq;
+                for(int i = 0; i < loop_max+1; ++i){
+                    next_permutation(seq.begin(),seq.end());
+                    int score = calc_score(seq);
+                    if(score<best_score){
+                        best_score = score;
+                        best_seq = seq;
+                    }
+                }
+                seq = best_seq;
+            }
         };
+
+        inline int calc_loop_max(int size){
+            int ret = 1;
+            constexpr int LOOP_MAX_MAX = 1000;
+            for(int i = 1; i < size; ++i){
+                ret*=(i+1);
+                if(LOOP_MAX_MAX<ret){
+                    ret = LOOP_MAX_MAX;
+                    break;
+                }
+            }
+            //cout << size << " " << ret << endl;
+            return ret;
+        }
+        inline int calc_score(const vector<int>& seq){
+            int ret=0,last=-1;
+            int weight = 3;
+            for(auto i : seq){
+                weight+=items_[i].weight();
+            }
+            for(auto next : seq){
+                int dist;
+                if(last==-1){
+                    dist = dtable_home_[next];
+                }else{
+                    dist = dtable_[next][last];
+                }
+                last=next;
+                ret+=dist*weight;
+                weight-=items_[next].weight();
+            }
+
+
+            ret += dtable_home_[last]*weight;
+            return ret;
+        }
         inline void build_actions(const vector<vector<int>>& items,vector<vector<int>>& actions){
             actions = vector<vector<int>>(4,vector<int>(0));
             for(int period = 0; period < 4; ++period){
@@ -162,19 +234,19 @@ namespace {
                 //cout << "period :" << period << ", size :" << items[period].size() << endl;
                 auto& targets = items[period];
                 for(auto target : targets){
-                    add_sequense(dist_to_items_[target],pos,actions[period]);
+                    add_sequense(dmap_to_items_[target],pos,actions[period]);
                 }
-                add_sequense(dist_to_home_,pos,actions[period]);
+                add_sequense(dmap_to_home_,pos,actions[period]);
             }
         }
-        inline void add_sequense(const vector<vector<int>>& dist_to_dest,Pos& pos,vector<int>& sequense){
-            int dist = dist_to_dest[pos.x][pos.y];
+        inline void add_sequense(const vector<vector<int>>& dmap_to_dest,Pos& pos,vector<int>& sequense){
+            int dist = dmap_to_dest[pos.x][pos.y];
             while(dist!=0){
                 for(int i = 0; i < 4; ++i){
                     int nx = pos.x+dxy[i*2], ny = pos.y+dxy[i*2+1];
                     if(within(0,nx,width_)&&within(0,ny,height_)){
-                        if((dist-1)==dist_to_dest[nx][ny]){
-                            dist = dist_to_dest[nx][ny];
+                        if((dist-1)==dmap_to_dest[nx][ny]){
+                            dist = dmap_to_dest[nx][ny];
                             sequense.push_back(i);
                             pos=pos.move(Action(i));
                             break;
