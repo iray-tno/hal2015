@@ -8,9 +8,39 @@
 ///             利用条件に従ってください
 
 //------------------------------------------------------------------------------
+#include <vector>
 
 #include "HPCAnswer.hpp"
 #include "HPCMath.hpp"
+namespace {
+    using namespace std;
+    using namespace hpc;
+    class Brain{
+    public:
+        Brain(){};
+        inline void init(const Stage& aStage){
+            items_ = aStage.items();
+            field_ = aStage.field();
+
+            num_of_items_ = items_.count();
+            width_ = field_.width();
+            height_ = field_.height();
+            init_d_table();
+        };
+    protected:
+        vector<vector<vector<int>>> d_table_;
+        int width_,height_;
+        ItemCollection items_;
+        int num_of_items_;
+        Field field_;
+        inline void init_d_table(){
+            d_table_ = 
+                vector<vector<vector<int>>>(num_of_items_,
+                    vector<vector<int>>(width_,
+                        vector<int>(height_,-1)));
+        };
+    };  
+}
 
 /// プロコン問題環境を表します。
 namespace hpc {
@@ -21,8 +51,9 @@ namespace hpc {
     /// ここで、各ステージに対して初期処理を行うことができます。
     ///
     /// @param[in] aStage 現在のステージ。
-    void Answer::Init(const Stage& aStage)
-    {
+    Brain smartest_brain;
+    void Answer::Init(const Stage& aStage){
+        smartest_brain.init(aStage);
     }
 
     //------------------------------------------------------------------------------
@@ -34,8 +65,7 @@ namespace hpc {
     ///
     /// @param[in] aStage 現在のステージ。
     /// @param[in] aItemGroup 荷物グループ。
-    void Answer::InitPeriod(const Stage& aStage, ItemGroup& aItemGroup)
-    {
+    void Answer::InitPeriod(const Stage& aStage, ItemGroup& aItemGroup){
         if (aStage.period() == 0) {
             return;
         }
@@ -54,8 +84,7 @@ namespace hpc {
     /// @param[in] aStage 現在ステージの情報。
     ///
     /// @return これから行う動作を表す Action クラス。
-    Action Answer::GetNextAction(const Stage& aStage)
-    {
+    Action Answer::GetNextAction(const Stage& aStage){
         static Random random; // デフォルトのシード値を使う
         static Pos prev; // 初期値は重要ではない。(前のゲームの値が残っていても気にしない)
 
