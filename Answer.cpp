@@ -142,12 +142,13 @@ namespace {
                 if(i!=-1){
                     int w = items_[i].weight();
                     while(true){
-                        if(Parameter::TruckWeightCapacity-4<weights[p]+w){
-                            ++p;
+                        if(Parameter::TruckWeightCapacity<weights[p]+w){
+                            p = (p+1)%4;
                             continue;
                         }else{
                             weights[p]+=w;
                             items[p].push_back(i);
+                            p = (p+1)%4;
                             break;
                         }
                     }
