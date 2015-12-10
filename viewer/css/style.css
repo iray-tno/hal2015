@@ -1,0 +1,124 @@
+<!--
+HAL Programming Contest 2015 Viewer
+Copyright (c) 2015 HAL Laboratory, Inc.
+ -->
+@charset "utf-8";
+
+body {
+  font-family: "ヒラギノ角ゴ ProN W3", "Hiragino Kaku Gothic ProN", "游ゴシック", YuGothic, "メイリオ", Meiryo, sans-serif;
+}
+
+.container {
+  min-width: 700px;
+}
+
+.info {
+  color: #f00;
+}
+
+.icon::before, .icon::after {
+  content: "";
+  color: #000;
+  border: 0 solid rgba(0, 0, 0, 0);
+  display: inline-block;
+}
+.icon[disabled]::before, .icon[disabled]::after {
+  color: #ccc;
+}
+.icon.icon-first::before, .icon.icon-first::after, .icon.icon-backward::before {
+  border-width: 5px 5px 5px 0;
+  border-right-color: currentColor;
+}
+.icon.icon-backward::before {
+  border-right-width: 10px;
+}
+.icon.icon-last::before, .icon.icon-last::after, .icon.icon-forward::before {
+  border-width: 5px 0 5px 5px;
+  border-left-color: currentColor;
+}
+.icon.icon-forward::before {
+  border-left-width: 10px;
+}
+section {
+  display: inline-block;
+  padding: 10px;
+}
+h1 {
+  margin: 0;
+  font-size: 20px;
+}
+#slider {
+  margin: 10px;
+}
+
+.btns {
+  line-height: 0;
+}
+.btns > button {
+  background: #f88;
+  border: 1px solid #444;
+  border-radius: 4px;
+  display: inline-block;
+  height: 12px;
+  margin: 1px;
+  padding: 0;
+  width: 12px;
+  line-height: 0;
+  font-size: 0;
+}
+.btns > button.current {
+  border-width: 3px;
+}
+.btns > button.success {
+  background: #8f8;
+}
+.btns > button[disabled] {
+  opacity: 0.5;
+}
+
+.field {
+  border: 2px solid #000;
+  border-collapse: collapse;
+  display: inline-block;
+}
+.field td {
+  border: 1px solid #ccc;
+  font-size: 16px;
+  height: 20px;
+  line-height: 0;
+  padding: 0;
+  width: 20px;
+  text-align: center;
+  vertical-align: middle;
+}
+.field .wall {
+  background: #ccc;
+}
+.field .start {
+  background: #8f8;
+}
+.field .to {
+  background: #fcc;
+  color: #000;
+}
+.field .to.done {
+  background: #fcc;
+  color: #888;
+}
+.field .to.target {
+  background: #f88;
+}
+
+.truck {
+  background: #dd0;
+  border-radius: 6px;
+  border: 2px solid;
+  border-color: #ff8 #884 #884 #ff8;
+  display: inline-block;
+  height: 13px;
+  position: absolute;
+  text-align: center;
+  transform: translate(1px, 2px);
+  width: 13px;
+  z-index: 1;
+}
