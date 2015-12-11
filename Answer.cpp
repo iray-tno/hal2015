@@ -209,8 +209,8 @@ namespace {
                 int period = items_[i].period();
                 bitset<BITS> item(0);
                 item[i] = true;
+                weights[item]=items_[i].weight();
                 if(period!=-1){
-                    weights[item]+=items_[i].weight();
                     period_clusters[period] |= item;
                     cout << period_clusters[period].to_string() << endl;
                 }else{
