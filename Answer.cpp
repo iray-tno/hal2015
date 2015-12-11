@@ -17,6 +17,7 @@
 #include <map>
 #include <queue>
 #include <bitset>
+#include <tuple>
 //#include <chrono>       // std::chrono::system_clock
 //https://ja.wikipedia.org/wiki/Composite_%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3
 
@@ -27,25 +28,27 @@ namespace {
     using namespace std;
     using namespace hpc;
     
+    constexpr int BITS = 16;
     constexpr int PINF = std::numeric_limits<int>::max();
     constexpr int MINF = std::numeric_limits<int>::lowest();
     template<class T = int> inline bool within(T min_x, T x, T max_x){ return min_x<=x&&x<max_x; }
     
-    /* Usage:
-      vector<tuple<int,string>> tuples;
-      tuples.push_back(make_tuple(0,"a"));
-      tuples.push_back(make_tuple(2,"c"));
-      tuples.push_back(make_tuple(1,"b"));
-    
-      sort(tuples.begin(), tuples.end(),TupleComparer<0>());
-      //"a","b","c"
-    
-      sort(tuples.rbegin(), tuples.rend(),TupleComparer<0>());
-      sort(tuples.begin(), tuples.end(),TupleComparer<0,greater>());
-      //"c","b","a"
-    */
-    
-    #include <tuple>
+    template<class T = int>
+    T binpow(T a, int n, T mod=std::numeric_limits<T>::max()){
+        if(n==0){ return 1;
+        }else if(n%2==1){
+            return (binpow(a,n-1)*a)%mod;
+        }else{
+            T b = binpow(a,n/2);
+            return (b*b)%mod;
+        }
+    }
+    template<class T = int>
+    inline T looppow(T a, int n, T mod=std::numeric_limits<T>::max()){
+        T ret = 1;
+        for(int i = 0; i < n; ++i){ ret*=a; }
+        return ret;
+    }
     
     template<int Index, template<typename> class F = std::less>
     struct TupleComparer{
@@ -66,6 +69,38 @@ namespace {
     };
 
     class BFSQuery{ public: int x,y,d; };
+    class UniteQuery{
+     public:
+        int a,b,d;
+        bool operator<(const UniteQuery& rhs) const{ return d > rhs.d; }
+    };
+    
+    class UnionFind{
+     private:
+      std::vector<int> p_gs_; //正なら親ノードの番号で負なら自身がルートで値は-groupsize
+      int groups_;            //groupの数
+    
+     public:
+      const int nodes;        //ノードの数
+    
+      UnionFind(int size):p_gs_(size, -1),groups_(size),nodes(size){}
+    
+      bool unite(int x, int y){
+        int rx = root(x), ry = root(y);
+        if(rx!=ry){
+          --groups_;
+          if(p_gs_[ry] < p_gs_[rx]) std::swap(rx, ry); //rx<ryにしてrxにryを連結
+          p_gs_[rx] += p_gs_[ry];
+          p_gs_[ry] = rx;
+        }
+        return rx != ry;
+      }
+    
+      bool same(int x, int y){ return root(x)==root(y); }
+      int root(int x){ return p_gs_[x]<0 ? x : p_gs_[x]=root(p_gs_[x]); }
+      int gsize(int x){ return -p_gs_[root(x)]; }
+      int groups() const{ return groups_; }
+    };
     constexpr int dxy[] = {-1,0,1,0,0,-1,0,1};
 
     class MindSet{ public: /*virtual think(){}*/ };
@@ -78,12 +113,14 @@ namespace {
             items_ = aStage.items();
             field_ = aStage.field();
 
+            memo_.clear();
             num_of_items_ = items_.count();
             width_ = field_.width();
             height_ = field_.height();
             home_ = field_.officePos();
             build_dmap();
             build_dtable();
+
         };
 
         inline void think(const Stage& aStage, vector<vector<int>>* items_p, vector<vector<int>>* actions_p){
@@ -106,6 +143,7 @@ namespace {
         vector<vector<int>> dtable_;
         vector<int> dtable_home_;
 
+        map<unsigned long,int> memo_;
 
         inline void build_dmap(){
             init_dmap();
@@ -183,8 +221,11 @@ namespace {
         inline void think_sequenses(vector<vector<int>>& items){
             //cout << "!think_sequenses" << endl;
             items = vector<vector<int>>(4,vector<int>(0));
-            random_clustering(items);
+            //random_clustering(items);
             clustering(items);
+            search_best_perm(items);
+        };
+        inline void search_best_perm(vector<vector<int>>& items){
             for(auto& seq : items){
                 int loop_max = calc_loop_max(seq.size());
                 int best_score = PINF;
@@ -199,23 +240,135 @@ namespace {
                 }
                 seq = best_seq;
             }
-        };
+        }
         inline void clustering(vector<vector<int>>& items){
-            constexpr int BITS = 16;
             vector<bitset<BITS>> period_clusters(4,bitset<BITS>());
-            map<bitset<BITS>,int,bitsetless> weights;
-            set<bitset<BITS>,bitsetless> clusters;
+            vector<int> id;
+            vector<bitset<BITS>> clusters;
+            calc_id_and_period_cluster(id,period_clusters);
+            do_union_find(id,clusters);
+            int clusters_size = clusters.size();
+
+            vector<int> pclusters_weight(4,0),clusters_weight(clusters_size,0);
+            calc_weight(period_clusters,pclusters_weight);
+            calc_weight(clusters,clusters_weight);
+
+            int loops = looppow(4,clusters_size);
+            int best_i=-1,best_score = PINF;
+
+            for(int i = 0; i < loops; ++i){
+                int score = 0;
+                bool valid = true;
+                vector<bitset<BITS>> diff(4,bitset<BITS>());
+                vector<int> diff_w(4,0);
+                int num = i,divi = loops;
+                for(int j = 0; j < clusters_size; ++j){
+                    divi/=4;
+                    diff[num/divi] |= clusters[j];
+                    diff_w[num/divi] += clusters_weight[j];
+                    num%=divi;
+                }
+                for(int j = 0; j < 4; ++j){
+                    if(15<diff_w[j]+pclusters_weight[j]){
+                        valid=false;
+                        break;
+                    }
+                    diff[j]|=period_clusters[j];
+                    //cout << diff[j].to_string() << " " << get_best(diff[j]) << endl;
+                    score += get_best(diff[j]);
+                }
+                if(valid&&score<best_score){
+                    best_score = score;
+                    best_i = i;
+                }
+            }
+            vector<bitset<BITS>> diff(4,bitset<BITS>());
+            int num = best_i,divi = loops;
+            for(int j = 0; j < clusters_size; ++j){
+                divi/=4;
+                diff[num/divi] |= clusters[j];
+                num%=divi;
+            }
+            for(int j = 0; j < 4; ++j){
+                diff[j]|=period_clusters[j];
+            }
+            for(int i = 0; i < 4; ++i){
+                for(int j = 0; j < BITS; ++j){
+                    if(diff[i][j]) items[i].push_back(j);
+                }
+            }
+            //cout << best_i << " " << best_score << endl;
+        }
+        inline int get_best(const bitset<BITS>& bits){
+            unsigned long bits_id = bits.to_ulong();
+            if(memo_.count(bits_id)==1) return memo_[bits_id];
+            int seq_size = bits.count();
+            vector<int> seq(seq_size,0);
+            int j = 0;
+            for(int i = 0; i < BITS; ++i){
+                if(bits[i]){
+                    seq[j] = i;
+                    ++j;
+                }
+            }
+            int loop_max = calc_loop_max(seq.size());
+            int best_score = calc_score(seq);
+            for(int i = 0; i < loop_max+1; ++i){
+                next_permutation(seq.begin(),seq.end());
+                int score = calc_score(seq);
+                if(score<best_score){
+                    best_score = score;
+                }
+            }
+            memo_[bits_id] = best_score;
+            return best_score;
+        }
+        inline void calc_weight(const vector<bitset<BITS>>& clusters, vector<int>& weights){
+            int clusters_size = clusters.size();
+            for(int i = 0; i < clusters_size; ++i){
+                int w=0;
+                for(int j = 0; j < BITS; ++j){
+                    if(clusters[i][j]) w+=items_[j].weight();
+                }
+                weights[i] = w;
+            }
+        }
+        inline void calc_id_and_period_cluster(vector<int>& id,vector<bitset<BITS>>& period_clusters){
             for(int i = 0; i < num_of_items_; ++i){
                 int period = items_[i].period();
                 bitset<BITS> item(0);
                 item[i] = true;
-                weights[item]=items_[i].weight();
                 if(period!=-1){
                     period_clusters[period] |= item;
-                    cout << period_clusters[period].to_string() << endl;
                 }else{
-                    clusters.insert(item);
+                    id.push_back(i);
                 }
+            }
+        }
+        inline void do_union_find(const vector<int>& id,vector<bitset<BITS>>& clusters,const int MAX_GROUPS=8,const int MAX_WEIGHT=15){
+            int id_size = id.size();
+            UnionFind uf(id_size);
+            priority_queue<UniteQuery> uqq;
+            for(int i = 0; i < id_size; ++i){
+                for(int j = i; j < id_size; ++j){
+                    uqq.push({i,j,dtable_[id[i]][id[j]]});
+                }
+            }
+            while(MAX_GROUPS<uf.groups()){
+                UniteQuery uq = uqq.top(); uqq.pop();
+                uf.unite(uq.a,uq.b);
+            }
+            int p_cluster_size = uf.groups();
+            clusters = vector<bitset<BITS>>(p_cluster_size,bitset<BITS>());
+            map<int,int> root_to_cid;
+            int roots_size = 0;
+            for(int i = 0; i < id_size; ++i){
+                int r = uf.root(i);
+                if(root_to_cid.count(r)==0){
+                    root_to_cid[r] = roots_size;
+                    ++roots_size;
+                }
+                clusters[ root_to_cid[r] ][ id[i] ] = true;
             }
         }
         inline void random_clustering(vector<vector<int>>& items){
@@ -258,7 +411,7 @@ namespace {
 
         inline int calc_loop_max(int size){
             int ret = 1;
-            constexpr int LOOP_MAX_MAX = 1000;
+            constexpr int LOOP_MAX_MAX = 5041;
             for(int i = 1; i < size; ++i){
                 ret*=(i+1);
                 if(LOOP_MAX_MAX<ret){
