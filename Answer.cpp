@@ -9,31 +9,71 @@
 
 //------------------------------------------------------------------------------
 #include <vector>
-#include <queue>
 #include <algorithm>
 #include <iostream>
 #include <iomanip>      // std::setfill, std::setw
 #include <random>       // std::default_random_engine
+#include <set>
+#include <map>
+#include <queue>
+#include <bitset>
 //#include <chrono>       // std::chrono::system_clock
 //https://ja.wikipedia.org/wiki/Composite_%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3
+
 #include "HPCAnswer.hpp"
 #include "HPCMath.hpp"
+
 namespace {
     using namespace std;
     using namespace hpc;
+    
     constexpr int PINF = std::numeric_limits<int>::max();
     constexpr int MINF = std::numeric_limits<int>::lowest();
     template<class T = int> inline bool within(T min_x, T x, T max_x){ return min_x<=x&&x<max_x; }
+    
+    /* Usage:
+      vector<tuple<int,string>> tuples;
+      tuples.push_back(make_tuple(0,"a"));
+      tuples.push_back(make_tuple(2,"c"));
+      tuples.push_back(make_tuple(1,"b"));
+    
+      sort(tuples.begin(), tuples.end(),TupleComparer<0>());
+      //"a","b","c"
+    
+      sort(tuples.rbegin(), tuples.rend(),TupleComparer<0>());
+      sort(tuples.begin(), tuples.end(),TupleComparer<0,greater>());
+      //"c","b","a"
+    */
+    
+    #include <tuple>
+    
+    template<int Index, template<typename> class F = std::less>
+    struct TupleComparer{
+      template<typename T>
+      bool operator()(T const &t1, T const &t2){
+        return F<typename std::tuple_element<Index, T>::type>()(std::get<Index>(t1), std::get<Index>(t2));
+      }
+    };
+    struct bitsetless{
+        template<long unsigned int _Nb> bool operator()(const bitset<_Nb> &t1, const bitset<_Nb> &t2){
+            return std::less<unsigned long>()(t1.to_ulong(),t2.to_ulong());
+        }
+    };
+    struct bitsetgrater{
+        template<long unsigned int _Nb> bool operator()(const bitset<_Nb> &t1, const bitset<_Nb> &t2){
+            return std::greater<unsigned long>()(t1.to_ulong(),t2.to_ulong());
+        }
+    };
+
     class BFSQuery{ public: int x,y,d; };
     constexpr int dxy[] = {-1,0,1,0,0,-1,0,1};
 
-    class MindSet{
-    public:
-        //virtual think(){}
-    };
+    class MindSet{ public: /*virtual think(){}*/ };
+
     class Brain{
-    public:
+     public:
         Brain(){};
+
         inline void init(const Stage& aStage){
             items_ = aStage.items();
             field_ = aStage.field();
@@ -45,9 +85,8 @@ namespace {
             build_dmap();
             build_dtable();
         };
+
         inline void think(const Stage& aStage, vector<vector<int>>* items_p, vector<vector<int>>* actions_p){
-            //vector<vector<int>>& items = *items_p;
-            //vector<vector<int>>& actions = *actions_p;
             think(aStage,*items_p,*actions_p);
         }
         inline void think(const Stage& aStage, vector<vector<int>>& items, vector<vector<int>>& actions){
@@ -55,20 +94,24 @@ namespace {
             think_sequenses(items);
             build_actions(items,actions);
         }
-    protected:
+     protected:
+        Pos home_;
+        Field field_;
+        int width_,height_;
+        ItemCollection items_;
+        int num_of_items_;
+
         vector<vector<vector<int>>> dmap_to_items_;
         vector<vector<int>> dmap_to_home_;
         vector<vector<int>> dtable_;
         vector<int> dtable_home_;
-        int width_,height_;
-        Pos home_;
-        ItemCollection items_;
-        int num_of_items_;
-        Field field_;
+
+
         inline void build_dmap(){
             init_dmap();
             calc_dmap();
         };
+
         inline void init_dmap(){
             dmap_to_items_ = 
                 vector<vector<vector<int>>>(num_of_items_,
@@ -77,18 +120,16 @@ namespace {
             dmap_to_home_ = vector<vector<int>>(width_,
                         vector<int>(height_,-1));
         };
+
         inline void calc_dmap(){
             for(int i = 0; i < num_of_items_; ++i){
                 Pos dest = items_[i].destination();
-                //int x_zero = dest.x, y_zero = dest.y;
-                //bfs_dmap(&dmap_to_items_[i],dest.x,dest.y);
                 bfs_dmap(dmap_to_items_[i],dest.x,dest.y);
             }
-            //bfs_dmap(&dmap_to_home_,home_.x,home_.y);
             bfs_dmap(dmap_to_home_,home_.x,home_.y);
         };
+
         inline void bfs_dmap(vector<vector<int>>* dmap_p,int x_zero,int y_zero){
-            //vector<vector<int>& field = *dmap_p;
             bfs_dmap(*dmap_p,x_zero,y_zero);
         }
         inline void bfs_dmap(vector<vector<int>>& dmap,int x_zero,int y_zero){
@@ -109,23 +150,23 @@ namespace {
                 }
             }
             return ;
-            for(int i = 0; i < width_; ++i){
-                for(int j = 0; j < height_; ++j){
-                    cout << " " << setfill(' ') << setw(3) << right << dmap[i][j];
-                    //cout << " " << dmap[i][j];
-                }
+            for(auto& line : dmap){
+                for(auto& p : line){ cout << setfill(' ') << setw(3) << right << p; }
                 cout << endl;
             }
         }
+
         inline void build_dtable(){
             init_dtable();
             calc_dtable();
         }
+
         inline void init_dtable(){
             dtable_ = vector<vector<int>>(num_of_items_,
                 vector<int>(num_of_items_,-1));
             dtable_home_ = vector<int>(num_of_items_,-1);
         };
+
         inline void calc_dtable(){
             int home_x = home_.x,home_y = home_.y;
             for(int i = 0; i < num_of_items_; ++i){
@@ -135,13 +176,50 @@ namespace {
                 for(int j = 0; j < num_of_items_; ++j){
                     int dist = dmap_to_items_[j][dest_x][dest_y];
                     dtable_[i][j] = dist;
-                    //dtable_[j][i] = dist;
                 }
             }
         };
+
         inline void think_sequenses(vector<vector<int>>& items){
             //cout << "!think_sequenses" << endl;
             items = vector<vector<int>>(4,vector<int>(0));
+            random_clustering(items);
+            clustering(items);
+            for(auto& seq : items){
+                int loop_max = calc_loop_max(seq.size());
+                int best_score = PINF;
+                vector<int> best_seq;
+                for(int i = 0; i < loop_max+1; ++i){
+                    next_permutation(seq.begin(),seq.end());
+                    int score = calc_score(seq);
+                    if(score<best_score){
+                        best_score = score;
+                        best_seq = seq;
+                    }
+                }
+                seq = best_seq;
+            }
+        };
+        inline void clustering(vector<vector<int>>& items){
+            constexpr int BITS = 16;
+            vector<bitset<BITS>> period_clusters(4,bitset<BITS>());
+            map<bitset<BITS>,int,bitsetless> weights;
+            set<bitset<BITS>,bitsetless> clusters;
+            for(int i = 0; i < num_of_items_; ++i){
+                int period = items_[i].period();
+                bitset<BITS> item(0);
+                item[i] = true;
+                if(period!=-1){
+                    weights[item]+=items_[i].weight();
+                    period_clusters[period] |= item;
+                    cout << period_clusters[period].to_string() << endl;
+                }else{
+                    clusters.insert(item);
+                }
+            }
+        }
+        inline void random_clustering(vector<vector<int>>& items){
+            //cout << "!random_clustering" << endl;
             vector<int> perm(num_of_items_,0);
             iota(perm.begin(), perm.end(), 0);
             constexpr unsigned seed = 114514;
@@ -176,21 +254,7 @@ namespace {
                     }
                 }
             }
-            for(auto& seq : items){
-                int loop_max = calc_loop_max(seq.size());
-                int best_score = PINF;
-                vector<int> best_seq;
-                for(int i = 0; i < loop_max+1; ++i){
-                    next_permutation(seq.begin(),seq.end());
-                    int score = calc_score(seq);
-                    if(score<best_score){
-                        best_score = score;
-                        best_seq = seq;
-                    }
-                }
-                seq = best_seq;
-            }
-        };
+        }
 
         inline int calc_loop_max(int size){
             int ret = 1;
@@ -205,6 +269,7 @@ namespace {
             //cout << size << " " << ret << endl;
             return ret;
         }
+
         inline int calc_score(const vector<int>& seq){
             int ret=0,last=-1;
             int weight = 3;
@@ -223,10 +288,10 @@ namespace {
                 weight-=items_[next].weight();
             }
 
-
             ret += dtable_home_[last]*weight;
             return ret;
         }
+
         inline void build_actions(const vector<vector<int>>& items,vector<vector<int>>& actions){
             actions = vector<vector<int>>(4,vector<int>(0));
             for(int period = 0; period < 4; ++period){
@@ -239,6 +304,7 @@ namespace {
                 add_sequense(dmap_to_home_,pos,actions[period]);
             }
         }
+
         inline void add_sequense(const vector<vector<int>>& dmap_to_dest,Pos& pos,vector<int>& sequense){
             int dist = dmap_to_dest[pos.x][pos.y];
             while(dist!=0){
@@ -273,8 +339,7 @@ namespace hpc {
     int period,turn,stage=-1;
     constexpr bool ISNOT_UNKO = true;
     void Answer::Init(const Stage& aStage){
-        ++stage;
-        //cout << "stage " << stage << endl;
+        ++stage; //cout << "stage " << stage << endl;
         smartest_brain.think(aStage,items,actions);
         period = -1;
         turn   = -1;
@@ -292,15 +357,12 @@ namespace hpc {
     /// @param[in] aStage 現在のステージ。
     /// @param[in] aItemGroup 荷物グループ。
     void Answer::InitPeriod(const Stage& aStage, ItemGroup& aItemGroup){
-
-        ++period;
+        ++period; //cout << "period : " << period << endl;
         turn=-1;
-        //cout << "period " << period << endl;
-        if(ISNOT_UNKO){
-            for(auto i : items[period]){ aItemGroup.addItem(i); }
-            return ;
-        }
-        InitPeriod_old(aStage,aItemGroup);
+        
+        for(auto i : items[period]){ aItemGroup.addItem(i); }
+        return ;
+        //InitPeriod_old(aStage,aItemGroup);
     }
 
     //------------------------------------------------------------------------------
@@ -310,14 +372,11 @@ namespace hpc {
     ///
     /// @return これから行う動作を表す Action クラス。
     Action Answer::GetNextAction(const Stage& aStage){
-
-        turn++;
-        //cout << "turn " << turn << endl;
-        if(ISNOT_UNKO){
-            //cout << actions[period][turn] << endl;
-            return Action(actions[period][turn]);
-        }
-        return GetNextAction_old(aStage);
+        turn++; //cout << "turn : " << turn << endl;
+        
+        //cout << actions[period][turn] << endl;
+        return Action(actions[period][turn]);
+        //return GetNextAction_old(aStage);
     }
 
     //------------------------------------------------------------------------------
@@ -365,7 +424,7 @@ namespace hpc {
             }
         }
     }
-
+/*
     Action GetNextAction_old(const Stage& aStage){
         static Random random; // デフォルトのシード値を使う
         static Pos prev; // 初期値は重要ではない。(前のゲームの値が残っていても気にしない)
@@ -385,6 +444,7 @@ namespace hpc {
             }
         }
     }
+*/
 }
 
 //------------------------------------------------------------------------------
