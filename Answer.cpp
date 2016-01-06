@@ -31,6 +31,11 @@ namespace {
     constexpr int BITS = 16;
     constexpr int PINF = std::numeric_limits<int>::max();
     constexpr int MINF = std::numeric_limits<int>::lowest();
+
+    constexpr int kMAX_GROUPS = 9;
+    constexpr int kMAX_WEIGHT = 4;
+    constexpr int kLOOP_MAX_MAX = 1000;
+    constexpr int kCOEFF = 3;
     template<class T = int> inline bool within(T min_x, T x, T max_x){ return min_x<=x&&x<max_x; }
     
     template<class T = int>
@@ -79,12 +84,12 @@ namespace {
      private:
       std::vector<int> p_gs_; //正なら親ノードの番号で負なら自身がルートで値は-groupsize
       int groups_;            //groupの数
-    
+
      public:
       const int nodes;        //ノードの数
-    
+
       UnionFind(int size):p_gs_(size, -1),groups_(size),nodes(size){}
-    
+
       bool unite(int x, int y){
         int rx = root(x), ry = root(y);
         if(rx!=ry){
@@ -95,7 +100,7 @@ namespace {
         }
         return rx != ry;
       }
-    
+
       bool same(int x, int y){ return root(x)==root(y); }
       int root(int x){ return p_gs_[x]<0 ? x : p_gs_[x]=root(p_gs_[x]); }
       int gsize(int x){ return -p_gs_[root(x)]; }
@@ -227,7 +232,7 @@ namespace {
         };
         inline void search_best_perm(vector<vector<int>>& items){
             for(auto& seq : items){
-                int loop_max = calc_loop_max(seq.size());
+                int loop_max = calc_loop_max(seq.size(),PINF);
                 int best_score = PINF;
                 vector<int> best_seq;
                 for(int i = 0; i < loop_max+1; ++i){
@@ -345,18 +350,25 @@ namespace {
                 }
             }
         }
-        inline void do_union_find(const vector<int>& id,vector<bitset<BITS>>& clusters,const int MAX_GROUPS=8,const int MAX_WEIGHT=15){
+        inline void do_union_find(const vector<int>& id,vector<bitset<BITS>>& clusters,const int MAX_GROUPS=kMAX_GROUPS,const int MAX_WEIGHT=kMAX_WEIGHT){
             int id_size = id.size();
             UnionFind uf(id_size);
             priority_queue<UniteQuery> uqq;
             for(int i = 0; i < id_size; ++i){
                 for(int j = i; j < id_size; ++j){
-                    uqq.push({i,j,dtable_[id[i]][id[j]]});
+
+                    //int score = -dtable_home_[id[i]]-dtable_home_[id[j]]+dtable_[id[i]][id[j]];
+                    int score = -dtable_home_[id[i]]-dtable_home_[id[j]]+dtable_[id[i]][id[j]]*kCOEFF;
+                    uqq.push({i,j,score});
+
+                    //uqq.push({i,j,dtable_[id[i]][id[j]]});
                 }
             }
             while(MAX_GROUPS<uf.groups()){
                 UniteQuery uq = uqq.top(); uqq.pop();
-                uf.unite(uq.a,uq.b);
+                if(uf.gsize(uq.a)+uf.gsize(uq.b)<MAX_WEIGHT){
+                    uf.unite(uq.a,uq.b);
+                }
             }
             int p_cluster_size = uf.groups();
             clusters = vector<bitset<BITS>>(p_cluster_size,bitset<BITS>());
@@ -409,9 +421,8 @@ namespace {
             }
         }
 
-        inline int calc_loop_max(int size){
+        inline int calc_loop_max(int size,int LOOP_MAX_MAX = kLOOP_MAX_MAX){
             int ret = 1;
-            constexpr int LOOP_MAX_MAX = 5041;
             for(int i = 1; i < size; ++i){
                 ret*=(i+1);
                 if(LOOP_MAX_MAX<ret){
@@ -490,7 +501,7 @@ namespace hpc {
     vector<vector<int>> items;
     vector<vector<int>> actions;
     int period,turn,stage=-1;
-    constexpr bool ISNOT_UNKO = true;
+    //constexpr bool ISNOT_UNKO = true;
     void Answer::Init(const Stage& aStage){
         ++stage; //cout << "stage " << stage << endl;
         smartest_brain.think(aStage,items,actions);
@@ -512,7 +523,7 @@ namespace hpc {
     void Answer::InitPeriod(const Stage& aStage, ItemGroup& aItemGroup){
         ++period; //cout << "period : " << period << endl;
         turn=-1;
-        
+
         for(auto i : items[period]){ aItemGroup.addItem(i); }
         return ;
         //InitPeriod_old(aStage,aItemGroup);
